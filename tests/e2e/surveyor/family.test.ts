@@ -252,24 +252,146 @@ test.describe("E2E: Alur Tambah Data Keluarga", () => {
     await expect(page).toHaveURL(SURVEYOR_ADD_DATA_FAMILY, { timeout: 5000 });
   });
 
-  // prettier-ignore
-  test("should prevent submission without uploading a photo", async ({ page }) => {
-    // Isi semua field WAJIB lainnya (kecuali foto)
-    await page.getByPlaceholder("Cth. Agus Miftah").fill("Tester Missing Photo");
-    await page.getByPlaceholder("Cth. 1234567890123456").fill("1111222233334445");
-    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. No Photo");
-    await page.getByPlaceholder("Cth. 11").nth(0).fill("4");
-
-    // Mock POST untuk mengembalikan 400 Bad Request (route.ts: if (!file) return status: 400)
+   // prettier-ignore
+  test("should reject negative number for family member count", async ({ page }) => {
     await page.route(`**${API_SURVEYOR_ADD_DATA_FAMILY}`, async (route) => {
       await route.fulfill({
         status: 400,
         contentType: "application/json",
-        body: JSON.stringify({ message: "Foto wajib diunggah." }),
+        body: JSON.stringify({ message: "Jumlah anggota keluarga harus positif." }),
       });
     });
 
-    // Isi Select & Radio
+    await page.getByPlaceholder("Cth. Agus Miftah").fill("Tester Negative Count");
+    await page.getByPlaceholder("Cth. 1234567890123456").fill("1234567890123456");
+    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. Negative");
+    await page.getByPlaceholder("Cth. 11").nth(0).fill("-5");
+    await page.getByLabel("Pilih Gambar").setInputFiles("public/images/favicon.svg");
+
+    await page.getByRole("button", { name: "Pilih Desa" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Saptorenggo" }).click();
+    await page.getByRole("button", { name: "Pilih Pendapatan Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp2 juta - Rp3 juta" }).click();
+    await page.getByRole("button", { name: "Pilih Pengeluaran Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp1 juta - Rp2 juta" }).click();
+    await page.getByRole("radio", { name: "Ya" }).first().check();
+    await page.getByRole("radio", { name: "Tidak" }).nth(1).check();
+    await page.getByRole("radio", { name: "Ya" }).nth(2).check();
+
+    await page.getByRole("button", { name: "Simpan" }).click();
+    await expect(page).toHaveURL(SURVEYOR_ADD_DATA_FAMILY, { timeout: 5000 });
+  });
+
+  // prettier-ignore
+  test("should reject duplicate KK number", async ({ page }) => {
+    const DUPLICATE_KK = "3501123456789012";
+
+    await page.route(`**${API_SURVEYOR_ADD_DATA_FAMILY}`, async (route) => {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Nomor Kartu Keluarga sudah terdaftar." }),
+      });
+    });
+
+    await page.getByPlaceholder("Cth. Agus Miftah").fill("Tester Duplicate KK");
+    await page.getByPlaceholder("Cth. 1234567890123456").fill(DUPLICATE_KK);
+    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. Duplicate");
+    await page.getByPlaceholder("Cth. 11").nth(0).fill("4");
+    await page.getByLabel("Pilih Gambar").setInputFiles("public/images/favicon.svg");
+
+    await page.getByRole("button", { name: "Pilih Desa" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Saptorenggo" }).click();
+    await page.getByRole("button", { name: "Pilih Pendapatan Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp2 juta - Rp3 juta" }).click();
+    await page.getByRole("button", { name: "Pilih Pengeluaran Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp1 juta - Rp2 juta" }).click();
+    await page.getByRole("radio", { name: "Ya" }).first().check();
+    await page.getByRole("radio", { name: "Tidak" }).nth(1).check();
+    await page.getByRole("radio", { name: "Ya" }).nth(2).check();
+
+    await page.getByRole("button", { name: "Simpan" }).click();
+    await expect(page).toHaveURL(SURVEYOR_ADD_DATA_FAMILY, { timeout: 5000 });
+  });
+
+  // prettier-ignore
+  test("should handle server error gracefully", async ({ page }) => {
+    await page.route(`**${API_SURVEYOR_ADD_DATA_FAMILY}`, async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Internal Server Error." }),
+      });
+    });
+
+    await page.getByPlaceholder("Cth. Agus Miftah").fill("Tester Server Error");
+    await page.getByPlaceholder("Cth. 1234567890123456").fill("9876543210987654");
+    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. Server Error");
+    await page.getByPlaceholder("Cth. 11").nth(0).fill("4");
+    await page.getByLabel("Pilih Gambar").setInputFiles("public/images/favicon.svg");
+
+    await page.getByRole("button", { name: "Pilih Desa" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Saptorenggo" }).click();
+    await page.getByRole("button", { name: "Pilih Pendapatan Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp2 juta - Rp3 juta" }).click();
+    await page.getByRole("button", { name: "Pilih Pengeluaran Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp1 juta - Rp2 juta" }).click();
+    await page.getByRole("radio", { name: "Ya" }).first().check();
+    await page.getByRole("radio", { name: "Tidak" }).nth(1).check();
+    await page.getByRole("radio", { name: "Ya" }).nth(2).check();
+
+    await page.getByRole("button", { name: "Simpan" }).click();
+    await expect(page).toHaveURL(SURVEYOR_ADD_DATA_FAMILY, { timeout: 5000 });
+  });
+
+  // prettier-ignore
+  test("should reject zero value for family member count", async ({ page }) => {
+    await page.route(`**${API_SURVEYOR_ADD_DATA_FAMILY}`, async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Jumlah anggota keluarga minimal 1." }),
+      });
+    });
+
+    await page.getByPlaceholder("Cth. Agus Miftah").fill("Tester Zero Count");
+    await page.getByPlaceholder("Cth. 1234567890123456").fill("1111222233334446");
+    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. Zero Count");
+    await page.getByPlaceholder("Cth. 11").nth(0).fill("0");
+    await page.getByLabel("Pilih Gambar").setInputFiles("public/images/favicon.svg");
+
+    await page.getByRole("button", { name: "Pilih Desa" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Saptorenggo" }).click();
+    await page.getByRole("button", { name: "Pilih Pendapatan Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp2 juta - Rp3 juta" }).click();
+    await page.getByRole("button", { name: "Pilih Pengeluaran Keluarga" }).click();
+    await page.getByRole("listitem").filter({ hasText: "Rp1 juta - Rp2 juta" }).click();
+    await page.getByRole("radio", { name: "Ya" }).first().check();
+    await page.getByRole("radio", { name: "Tidak" }).nth(1).check();
+    await page.getByRole("radio", { name: "Ya" }).nth(2).check();
+
+    await page.getByRole("button", { name: "Simpan" }).click();
+    await expect(page).toHaveURL(SURVEYOR_ADD_DATA_FAMILY, { timeout: 5000 });
+  });
+
+  // prettier-ignore
+  test("should reject excessively long name input", async ({ page }) => {
+    const LONG_NAME = "A".repeat(256); // Nama terlalu panjang
+
+    await page.route(`**${API_SURVEYOR_ADD_DATA_FAMILY}`, async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Nama kepala keluarga terlalu panjang." }),
+      });
+    });
+
+    await page.getByPlaceholder("Cth. Agus Miftah").fill(LONG_NAME);
+    await page.getByPlaceholder("Cth. 1234567890123456").fill("1234567890123456");
+    await page.getByPlaceholder("Cth. Perumahan Meikarta").fill("Jl. Long Name");
+    await page.getByPlaceholder("Cth. 11").nth(0).fill("4");
+    await page.getByLabel("Pilih Gambar").setInputFiles("public/images/favicon.svg");
+
     await page.getByRole("button", { name: "Pilih Desa" }).click();
     await page.getByRole("listitem").filter({ hasText: "Saptorenggo" }).click();
     await page.getByRole("button", { name: "Pilih Pendapatan Keluarga" }).click();
